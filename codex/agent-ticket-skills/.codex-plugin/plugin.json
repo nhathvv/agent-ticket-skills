@@ -1,0 +1,32 @@
+{
+  "name": "agent-ticket-skills",
+  "version": "0.1.0",
+  "description": "Codex skills for Plane ticket reading and superpowers-driven ticket workflows.",
+  "author": {
+    "name": "Local"
+  },
+  "license": "MIT",
+  "keywords": [
+    "tickets",
+    "plane",
+    "skills",
+    "superpowers"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Agent Ticket Skills",
+    "shortDescription": "Read Plane tickets and route implementation through Codex superpowers.",
+    "longDescription": "Provides a read-only Plane ticket reader and a ticket workflow skill that coordinates requirements, planning, implementation, and verification through Codex superpowers.",
+    "developerName": "Local",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Read ticket TAD-1816 and plan the work.",
+      "Implement Plane ticket TAD-1816.",
+      "Investigate bug ticket TAD-1816."
+    ]
+  }
+}

@@ -1,0 +1,395 @@
+#!/usr/bin/env python3
+"""Plane.so read-only CLI for agent ticket workflows."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+
+
+def load_env_file() -> None:
+    current = Path.cwd()
+    for directory in (current, *current.parents):
+        env_path = directory / ".env"
+        if not env_path.is_file():
+            continue
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
+        return
+
+
+load_env_file()
+
+API_KEY = os.environ.get("PLANE_API_KEY")
+WORKSPACE = os.environ.get("PLANE_WORKSPACE")
+BASE_URL = os.environ.get("PLANE_BASE_URL", "https://api.plane.so")
+
+
+def fail(message: str) -> None:
+    print(f"Error: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def check_env() -> None:
+    missing = [
+        name
+        for name, value in (
+            ("PLANE_API_KEY", API_KEY),
+            ("PLANE_WORKSPACE", WORKSPACE),
+            ("PLANE_BASE_URL", BASE_URL),
+        )
+        if not value
+    ]
+    if missing:
+        fail("missing required environment variables: " + ", ".join(missing))
+
+
+def validate_id(value: str, label: str) -> str:
+    if "/" in value or "\\" in value or ".." in value:
+        fail(f"invalid {label}: contains path characters")
+    return value
+
+
+def api_get(endpoint: str) -> Any:
+    check_env()
+    url = f"{BASE_URL.rstrip('/')}/api/v1{endpoint}"
+    if not url.startswith(("http://", "https://")):
+        fail(f"invalid Plane base URL: {BASE_URL}")
+    request = Request(
+        url,
+        headers={
+            "X-API-Key": API_KEY or "",
+            "Content-Type": "application/json",
+            "User-Agent": "agent-ticket-skills-plane-cli",
+        },
+        method="GET",
+    )
+    try:
+        with urlopen(request, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        body = error.read().decode("utf-8") if error.fp else str(error)
+        fail(f"Plane API returned {error.code}: {body}")
+    except URLError as error:
+        fail(f"could not reach Plane API: {error.reason}")
+    except TimeoutError:
+        fail("Plane API request timed out")
+
+
+def unwrap_results(data: Any) -> list[Any]:
+    if isinstance(data, dict) and isinstance(data.get("results"), list):
+        return data["results"]
+    if isinstance(data, list):
+        return data
+    return []
+
+
+def paged_get(endpoint: str) -> list[Any]:
+    results: list[Any] = []
+    while endpoint:
+        data = api_get(endpoint)
+        results.extend(unwrap_results(data))
+        next_url = data.get("next") if isinstance(data, dict) else None
+        endpoint = next_url.split("/api/v1", 1)[-1] if next_url else ""
+    return results
+
+
+def resolve(value: Any) -> str:
+    if value is None:
+        return "-"
+    if isinstance(value, dict):
+        return str(value.get("name") or value.get("display_name") or value.get("id") or value)
+    return str(value)
+
+
+def print_json(data: Any) -> None:
+    print(json.dumps(data, indent=2, ensure_ascii=False))
+
+
+def print_table(rows: list[dict[str, Any]], columns: list[tuple[str, str, int]]) -> None:
+    if not rows:
+        print("No results.")
+        return
+    widths = [len(header) for _, header, _ in columns]
+    rendered: list[list[str]] = []
+    for row in rows:
+        cells = []
+        for index, (key, _, max_width) in enumerate(columns):
+            value = resolve(row.get(key))
+            if len(value) > max_width:
+                value = value[: max_width - 1] + "…"
+            widths[index] = min(max(widths[index], len(value)), max_width)
+            cells.append(value)
+        rendered.append(cells)
+    print("  ".join(header.ljust(widths[index]) for index, (_, header, _) in enumerate(columns)))
+    print("  ".join("-" * width for width in widths))
+    for cells in rendered:
+        print("  ".join(cell.ljust(widths[index]) for index, cell in enumerate(cells)))
+
+
+def output(data: Any, fmt: str) -> None:
+    if fmt == "json":
+        print_json(data)
+        return
+    rows = unwrap_results(data)
+    if rows:
+        sample = rows[0]
+        if "identifier" in sample and "name" in sample:
+            print_table(rows, [("identifier", "ID", 12), ("name", "NAME", 48), ("id", "UUID", 36)])
+        elif "sequence_id" in sample and "name" in sample:
+            print_table(rows, [("sequence_id", "SEQ", 8), ("name", "NAME", 56), ("priority", "PRI", 8), ("state", "STATE", 24), ("id", "UUID", 36)])
+        elif "display_name" in sample:
+            print_table(rows, [("display_name", "NAME", 32), ("email", "EMAIL", 44), ("id", "UUID", 36)])
+        else:
+            print_json(rows)
+        return
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if not key.startswith("_"):
+                print(f"{key}: {resolve(value)}")
+        return
+    print_json(data)
+
+
+def project_for_identifier(identifier: str) -> dict[str, Any]:
+    projects = unwrap_results(api_get(f"/workspaces/{WORKSPACE}/projects/"))
+    for project in projects:
+        if str(project.get("identifier", "")).upper() == identifier.upper():
+            return project
+    fail(f"project identifier not found: {identifier}")
+
+
+def split_ticket_id(ticket_id: str) -> tuple[str, int]:
+    if "-" not in ticket_id:
+        fail("ticket ID must look like PROJECT-123")
+    identifier, sequence = ticket_id.rsplit("-", 1)
+    if not identifier or not sequence.isdigit():
+        fail("ticket ID must look like PROJECT-123")
+    return identifier.upper(), int(sequence)
+
+
+def cmd_me(args: argparse.Namespace) -> None:
+    output(api_get("/users/me/"), args.format)
+
+
+def cmd_members(args: argparse.Namespace) -> None:
+    output(api_get(f"/workspaces/{WORKSPACE}/members/"), args.format)
+
+
+def cmd_projects_list(args: argparse.Namespace) -> None:
+    output(api_get(f"/workspaces/{WORKSPACE}/projects/"), args.format)
+
+
+def cmd_projects_get(args: argparse.Namespace) -> None:
+    project = validate_id(args.project, "project ID")
+    output(api_get(f"/workspaces/{WORKSPACE}/projects/{project}/"), args.format)
+
+
+def cmd_issues_list(args: argparse.Namespace) -> None:
+    project = validate_id(args.project, "project ID")
+    params = {
+        key: value
+        for key, value in {
+            "state": args.state,
+            "priority": args.priority,
+            "assignees": args.assignee,
+        }.items()
+        if value
+    }
+    endpoint = f"/workspaces/{WORKSPACE}/projects/{project}/work-items/"
+    if params:
+        endpoint += "?" + urlencode(params)
+    output(api_get(endpoint), args.format)
+
+
+def cmd_issues_get(args: argparse.Namespace) -> None:
+    project = validate_id(args.project, "project ID")
+    issue = validate_id(args.issue, "issue ID")
+    output(api_get(f"/workspaces/{WORKSPACE}/projects/{project}/work-items/{issue}/"), args.format)
+
+
+def find_issue(ticket_id: str, expand: bool) -> dict[str, Any]:
+    identifier, sequence_id = split_ticket_id(ticket_id)
+    project = project_for_identifier(identifier)
+    project_id = project["id"]
+    endpoint = f"/workspaces/{WORKSPACE}/projects/{project_id}/work-items/?per_page=100"
+    for issue in paged_get(endpoint):
+        if int(issue.get("sequence_id", -1)) == sequence_id:
+            detail = f"/workspaces/{WORKSPACE}/projects/{project_id}/work-items/{issue['id']}/"
+            if expand:
+                detail += "?expand=issue_reactions,issue_attachments,issue_link,parent"
+            return api_get(detail)
+    fail(f"ticket not found: {ticket_id}")
+
+
+def cmd_issues_fast_get(args: argparse.Namespace) -> None:
+    output(find_issue(args.ticket_id, args.expand), args.format)
+
+
+def cmd_issues_search(args: argparse.Namespace) -> None:
+    query = args.query.lower()
+    matches: list[dict[str, Any]] = []
+    for project in unwrap_results(api_get(f"/workspaces/{WORKSPACE}/projects/")):
+        project_id = project["id"]
+        project_key = project.get("identifier", "")
+        endpoint = f"/workspaces/{WORKSPACE}/projects/{project_id}/work-items/?per_page=100"
+        for issue in paged_get(endpoint):
+            sequence = f"{project_key}-{issue.get('sequence_id')}".lower()
+            name = str(issue.get("name", "")).lower()
+            if query in sequence or query in name:
+                matches.append(issue)
+    output(matches, args.format)
+
+
+def cmd_comments_list(args: argparse.Namespace) -> None:
+    project = validate_id(args.project, "project ID")
+    issue = validate_id(args.issue, "issue ID")
+    data = api_get(f"/workspaces/{WORKSPACE}/projects/{project}/work-items/{issue}/activities/")
+    items = unwrap_results(data)
+    if args.format == "json":
+        print_json(items)
+        return
+    for item in items:
+        field = item.get("field")
+        if field == "comment":
+            actor = resolve(item.get("actor_detail") or item.get("actor"))
+            created = str(item.get("created_at", ""))[:19]
+            print(f"{actor}  {created}")
+            print(resolve(item.get("comment")))
+            print()
+        elif args.all:
+            print_json(item)
+
+
+def cmd_states(args: argparse.Namespace) -> None:
+    project = validate_id(args.project, "project ID")
+    output(api_get(f"/workspaces/{WORKSPACE}/projects/{project}/states/"), args.format)
+
+
+def cmd_labels(args: argparse.Namespace) -> None:
+    project = validate_id(args.project, "project ID")
+    output(api_get(f"/workspaces/{WORKSPACE}/projects/{project}/labels/"), args.format)
+
+
+def cmd_cycles_list(args: argparse.Namespace) -> None:
+    project = validate_id(args.project, "project ID")
+    output(api_get(f"/workspaces/{WORKSPACE}/projects/{project}/cycles/"), args.format)
+
+
+def cmd_cycles_get(args: argparse.Namespace) -> None:
+    project = validate_id(args.project, "project ID")
+    cycle = validate_id(args.cycle, "cycle ID")
+    output(api_get(f"/workspaces/{WORKSPACE}/projects/{project}/cycles/{cycle}/"), args.format)
+
+
+def cmd_modules_list(args: argparse.Namespace) -> None:
+    project = validate_id(args.project, "project ID")
+    output(api_get(f"/workspaces/{WORKSPACE}/projects/{project}/modules/"), args.format)
+
+
+def cmd_modules_get(args: argparse.Namespace) -> None:
+    project = validate_id(args.project, "project ID")
+    module = validate_id(args.module, "module ID")
+    output(api_get(f"/workspaces/{WORKSPACE}/projects/{project}/modules/{module}/"), args.format)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Plane.so read-only CLI for agent ticket workflows.")
+    parser.add_argument("--format", "-f", choices=["table", "json"], default="table")
+    subparsers = parser.add_subparsers(dest="command")
+
+    me = subparsers.add_parser("me", help="Show authenticated user")
+    me.set_defaults(func=cmd_me)
+
+    members = subparsers.add_parser("members", help="List workspace members")
+    members.set_defaults(func=cmd_members)
+
+    projects = subparsers.add_parser("projects", help="Read projects")
+    project_sub = projects.add_subparsers(dest="subcommand")
+    project_list = project_sub.add_parser("list", help="List projects")
+    project_list.set_defaults(func=cmd_projects_list)
+    project_get = project_sub.add_parser("get", help="Get project details")
+    project_get.add_argument("project")
+    project_get.set_defaults(func=cmd_projects_get)
+
+    issues = subparsers.add_parser("issues", help="Read work items")
+    issue_sub = issues.add_subparsers(dest="subcommand")
+    issue_list = issue_sub.add_parser("list", help="List work items")
+    issue_list.add_argument("--project", "-p", required=True)
+    issue_list.add_argument("--state")
+    issue_list.add_argument("--priority")
+    issue_list.add_argument("--assignee")
+    issue_list.set_defaults(func=cmd_issues_list)
+    issue_get = issue_sub.add_parser("get", help="Get work item details")
+    issue_get.add_argument("--project", "-p", required=True)
+    issue_get.add_argument("issue")
+    issue_get.set_defaults(func=cmd_issues_get)
+    issue_fast = issue_sub.add_parser("fast-get", help="Find a work item by sequence ID such as TAD-1816")
+    issue_fast.add_argument("ticket_id")
+    issue_fast.add_argument("--expand", action="store_true")
+    issue_fast.set_defaults(func=cmd_issues_fast_get)
+    issue_search = issue_sub.add_parser("search", help="Search work items by sequence ID or title")
+    issue_search.add_argument("query")
+    issue_search.set_defaults(func=cmd_issues_search)
+
+    comments = subparsers.add_parser("comments", help="Read work item comments and activity")
+    comment_sub = comments.add_subparsers(dest="subcommand")
+    comment_list = comment_sub.add_parser("list", help="List comments")
+    comment_list.add_argument("--project", "-p", required=True)
+    comment_list.add_argument("--issue", "-i", required=True)
+    comment_list.add_argument("--all", action="store_true")
+    comment_list.set_defaults(func=cmd_comments_list)
+
+    states = subparsers.add_parser("states", help="List workflow states")
+    states.add_argument("--project", "-p", required=True)
+    states.set_defaults(func=cmd_states)
+
+    labels = subparsers.add_parser("labels", help="List labels")
+    labels.add_argument("--project", "-p", required=True)
+    labels.set_defaults(func=cmd_labels)
+
+    cycles = subparsers.add_parser("cycles", help="Read cycles")
+    cycle_sub = cycles.add_subparsers(dest="subcommand")
+    cycle_list = cycle_sub.add_parser("list", help="List cycles")
+    cycle_list.add_argument("--project", "-p", required=True)
+    cycle_list.set_defaults(func=cmd_cycles_list)
+    cycle_get = cycle_sub.add_parser("get", help="Get cycle details")
+    cycle_get.add_argument("--project", "-p", required=True)
+    cycle_get.add_argument("cycle")
+    cycle_get.set_defaults(func=cmd_cycles_get)
+
+    modules = subparsers.add_parser("modules", help="Read modules")
+    module_sub = modules.add_subparsers(dest="subcommand")
+    module_list = module_sub.add_parser("list", help="List modules")
+    module_list.add_argument("--project", "-p", required=True)
+    module_list.set_defaults(func=cmd_modules_list)
+    module_get = module_sub.add_parser("get", help="Get module details")
+    module_get.add_argument("--project", "-p", required=True)
+    module_get.add_argument("module")
+    module_get.set_defaults(func=cmd_modules_get)
+
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
+    args = parser.parse_args()
+    if not hasattr(args, "func"):
+        parser.print_help()
+        raise SystemExit(1)
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

@@ -12,7 +12,7 @@ targets Codex and routes ticket work through Codex superpowers.
 
 - `plane-ticket-reader`: read-only Plane.so access for projects, work items, comments,
   states, labels, members, cycles, and modules.
-- `ba`: creates and validates feature specs in `specs/FEAT-XXX-<slug>.md`.
+- `ba`: creates and validates ticket-scoped feature specs in `tasks/<ticket-id>/spec.md`.
 - `lead`: reviews specs, approves development, creates ADRs, and flags tech debt.
 - `ticket-workflow`: a ticket orchestration skill that fetches ticket context, creates
   task artifacts, classifies the work, and routes the next phase through superpowers.
@@ -211,7 +211,7 @@ Use ticket-workflow to investigate bug ticket TAD-1816. Reproduce or characteriz
 
 1. Fetch ticket context with `plane-ticket-reader`.
 2. Save raw context to `tasks/<ticket-id>/ticket-context.json`.
-3. Ask BA to create or audit `specs/FEAT-XXX-<slug>.md`.
+3. Ask BA to create or audit `tasks/<ticket-id>/spec.md`.
 4. Ask Lead to review the spec, create an ADR if needed, and approve or block development.
 5. Classify the ticket as bug, feature, refactor, investigation, docs, or config.
 6. Route to the right superpower phase:
@@ -222,9 +222,22 @@ Use ticket-workflow to investigate bug ticket TAD-1816. Reproduce or characteriz
    - `superpowers:test-driven-development`
    - `superpowers:verification-before-completion`
    - `superpowers:requesting-code-review`
-7. Track findings and progress under `tasks/<ticket-id>/` when needed.
-8. Report ticket summary, spec status, Lead decision, changed files, validation, gaps,
-   and branch/worktree details.
+7. Save plans at `tasks/<ticket-id>/plan.md` and ADRs at `tasks/<ticket-id>/adr.md`.
+8. Track findings and progress under `tasks/<ticket-id>/` when needed.
+9. Report ticket summary, spec status, Lead decision, plan path, changed files,
+   validation, gaps, and branch/worktree details.
+
+Ticket artifacts are kept together:
+
+```text
+tasks/<ticket-id>/
+├── ticket-context.json
+├── spec.md
+├── plan.md
+├── adr.md
+├── findings.md
+└── progress.md
+```
 
 ## Plane CLI Commands
 

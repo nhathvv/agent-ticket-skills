@@ -19,7 +19,8 @@ the green light or block. Do not write feature code or tests.
 
 ## Step 1 - Load Context
 
-- If given a `FEAT-ID`, read `specs/FEAT-XXX-*.md`.
+- If given a ticket ID, read `tasks/<ticket-id>/spec.md` and `tasks/<ticket-id>/ticket-context.json`.
+- If given a spec path, read that file and its containing ticket workspace.
 - If given a file or directory, read those files.
 - If given nothing, run `git diff main --name-only` and ask what to review.
 
@@ -43,15 +44,17 @@ Answer each item with `Pass`, `Fail`, or `N/A`, plus a one-line reason.
 Does this change introduce a new service, a new data store, a new external dependency,
 or a changed public API contract?
 
-- Yes: create `docs/adr/NNNN-<slug>.md` after scanning `docs/adr/` for the next number.
+- Yes: create `tasks/<ticket-id>/adr.md` by default. If multiple ADRs are needed for
+  the same ticket, ask whether to split them into separate files.
 - No: state `No ADR required.`
 
 ADR format:
 
 ```markdown
-# ADR-NNNN - [Title]
+# [Ticket ID] ADR - [Title]
 
 > Status: proposed
+> Ticket: <ticket-id>
 > Date: YYYY-MM-DD
 > Deciders: @
 
@@ -93,11 +96,11 @@ If approved, set the spec status to:
 Then declare:
 
 ```text
-As Lead: FEAT-XXX approved for implementation. Dev can proceed.
+As Lead: <ticket-id> approved for implementation. Dev can proceed.
 ```
 
 If blocked, list all blocking issues and declare:
 
 ```text
-As Lead: FEAT-XXX blocked - [N] issues must be resolved before Dev starts.
+As Lead: <ticket-id> blocked - [N] issues must be resolved before Dev starts.
 ```

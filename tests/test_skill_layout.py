@@ -20,6 +20,26 @@ class SkillLayoutTests(unittest.TestCase):
             self.assertTrue(adapter_entry.exists(), f"missing adapter skill: {adapter_entry}")
             self.assertEqual(os.path.realpath(adapter_entry), str(source_entry))
 
+    def test_ticket_workflow_uses_ticket_scoped_artifacts(self):
+        workflow = (ROOT / "skills" / "ticket-workflow" / "SKILL.md").read_text(encoding="utf-8")
+        lifecycle = (
+            ROOT / "skills" / "ticket-workflow" / "references" / "ticket-lifecycle.md"
+        ).read_text(encoding="utf-8")
+        combined = workflow + "\n" + lifecycle
+
+        for expected in (
+            "tasks/<ticket-id>/ticket-context.json",
+            "tasks/<ticket-id>/spec.md",
+            "tasks/<ticket-id>/plan.md",
+            "tasks/<ticket-id>/adr.md",
+            "findings.md",
+            "progress.md",
+        ):
+            self.assertIn(expected, combined)
+
+        self.assertNotIn("specs/FEAT-XXX", combined)
+        self.assertNotIn("docs/adr/NNNN", combined)
+
 
 if __name__ == "__main__":
     unittest.main()

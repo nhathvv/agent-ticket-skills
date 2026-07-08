@@ -59,6 +59,6 @@ Investigation-only:
 ```text
 plane-ticket-reader
 ticket-workflow ticket-context.json
-findings.md
+tasks/<ticket-id>/findings.md
 superpowers:verification-before-completion
 ```

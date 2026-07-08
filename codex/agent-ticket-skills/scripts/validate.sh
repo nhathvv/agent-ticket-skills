@@ -11,6 +11,13 @@ python3 "$ROOT/skills/plane-ticket-reader/scripts/plane" --help >/dev/null
 python3 "$ROOT/skills/plane-ticket-reader/scripts/plane" issues --help >/dev/null
 python3 "$ROOT/skills/plane-ticket-reader/scripts/plane" comments --help >/dev/null
 
+PLUGIN_VALIDATOR="${CODEX_PLUGIN_VALIDATOR:-${CODEX_HOME:-$HOME/.codex}/skills/.system/plugin-creator/scripts/validate_plugin.py}"
+if [[ -f "$PLUGIN_VALIDATOR" ]]; then
+  python3 "$PLUGIN_VALIDATOR" "$PLUGIN_ROOT"
+else
+  echo "Skipping Codex plugin schema validation; validator not found at $PLUGIN_VALIDATOR" >&2
+fi
+
 python3 - "$ROOT" "$PLUGIN_ROOT" <<'PY'
 import json
 import os

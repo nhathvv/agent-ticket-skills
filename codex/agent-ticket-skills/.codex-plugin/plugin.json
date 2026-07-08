@@ -1,6 +1,6 @@
 {
   "name": "agent-ticket-skills",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Codex skills for Plane ticket reading, BA specs, Lead review, and superpowers-driven implementation workflows.",
   "author": {
     "name": "Local"

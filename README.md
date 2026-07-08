@@ -1,5 +1,7 @@
 # Agent Ticket Skills
 
+Current Codex plugin version: `0.1.2`.
+
 Reusable agent skills for ticket-driven development.
 
 This repo is intentionally runtime-neutral at the source layer. The canonical skills
@@ -77,7 +79,7 @@ searches from the current directory upward and loads the first `.env` it finds.
 From this repo:
 
 ```bash
-cd /Users/nhathv/DEV/agent-ticket-skills
+cd /path/to/agent-ticket-skills
 codex/agent-ticket-skills/scripts/validate.sh
 ```
 
@@ -92,8 +94,47 @@ This checks:
 Validate the Codex plugin manifest directly:
 
 ```bash
-python3 /Users/nhathv/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py \
-  /Users/nhathv/DEV/agent-ticket-skills/codex/agent-ticket-skills
+python3 "$HOME/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py" \
+  "$(pwd)/codex/agent-ticket-skills"
+```
+
+`validate.sh` runs this schema validator automatically when it is available. Set
+`CODEX_PLUGIN_VALIDATOR=/path/to/validate_plugin.py` to use a non-default validator path.
+
+## Install In Personal Codex Marketplace
+
+For local Codex marketplace use, point the personal marketplace plugin source at the Codex
+adapter:
+
+```bash
+cd /path/to/agent-ticket-skills
+mkdir -p "$HOME/.agents/plugins/plugins"
+ln -s "$(pwd)/codex/agent-ticket-skills" \
+  "$HOME/.agents/plugins/plugins/agent-ticket-skills"
+```
+
+The marketplace entry should use this local source:
+
+```json
+{
+  "name": "agent-ticket-skills",
+  "source": {
+    "source": "local",
+    "path": "./plugins/agent-ticket-skills"
+  },
+  "policy": {
+    "installation": "AVAILABLE",
+    "authentication": "ON_INSTALL"
+  },
+  "category": "Productivity"
+}
+```
+
+The plugin exposes the Codex skills. The bundled Plane CLI is still an executable script inside
+the repo, so make it available in shells where the workflow will fetch live Plane tickets:
+
+```bash
+export PATH="/path/to/agent-ticket-skills/skills/plane-ticket-reader/scripts:$PATH"
 ```
 
 ## Use In A Target Repo
@@ -108,17 +149,18 @@ git status
 Expose the skills at project level:
 
 ```bash
+AGENT_TICKET_SKILLS_ROOT=/path/to/agent-ticket-skills
 mkdir -p .codex/skills
-ln -s /Users/nhathv/DEV/agent-ticket-skills/skills/plane-ticket-reader .codex/skills/plane-ticket-reader
-ln -s /Users/nhathv/DEV/agent-ticket-skills/skills/ticket-workflow .codex/skills/ticket-workflow
-ln -s /Users/nhathv/DEV/agent-ticket-skills/skills/ba .codex/skills/ba
-ln -s /Users/nhathv/DEV/agent-ticket-skills/skills/lead .codex/skills/lead
+ln -s "$AGENT_TICKET_SKILLS_ROOT/skills/plane-ticket-reader" .codex/skills/plane-ticket-reader
+ln -s "$AGENT_TICKET_SKILLS_ROOT/skills/ticket-workflow" .codex/skills/ticket-workflow
+ln -s "$AGENT_TICKET_SKILLS_ROOT/skills/ba" .codex/skills/ba
+ln -s "$AGENT_TICKET_SKILLS_ROOT/skills/lead" .codex/skills/lead
 ```
 
 Add the Plane CLI to `PATH` for the current shell:
 
 ```bash
-export PATH="/Users/nhathv/DEV/agent-ticket-skills/skills/plane-ticket-reader/scripts:$PATH"
+export PATH="/path/to/agent-ticket-skills/skills/plane-ticket-reader/scripts:$PATH"
 ```
 
 Smoke test:

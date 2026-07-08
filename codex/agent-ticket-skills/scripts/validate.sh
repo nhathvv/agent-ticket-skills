@@ -36,7 +36,7 @@ if manifest["name"] != "agent-ticket-skills":
 if manifest.get("skills") != "./skills/":
     raise SystemExit("plugin skills path must be ./skills/")
 
-for name in ("plane-ticket-reader", "ticket-workflow"):
+for name in ("ba", "lead", "plane-ticket-reader", "ticket-workflow"):
     adapter_entry = plugin_root / "skills" / name
     source_entry = root / "skills" / name
     if not adapter_entry.exists():

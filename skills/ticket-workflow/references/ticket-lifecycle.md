@@ -19,20 +19,29 @@ Fetch comments when the description is sparse, stale, or references discussion:
 plane comments list -p PROJECT_UUID -i ISSUE_UUID -f json
 ```
 
-## Task Directory
+## Ticket Context
 
-Create `tasks/<ticket-id>/req.md` with:
+Create `tasks/<ticket-id>/ticket-context.json` with the raw ticket JSON and relevant
+comments or activity. Preserve the source data so BA and Lead artifacts can be reviewed
+without refetching Plane.
 
-- Ticket ID and title.
-- Type or inferred classification.
-- Priority, state, assignee, labels, and links when available.
-- Description.
-- Relevant comments or activity.
-- Assumptions and missing information.
+Also create `tasks/<ticket-id>/progress.md` when work will continue beyond intake.
 
 Do not start implementation if `tasks/<ticket-id>/` already exists with unfinished work
 that conflicts with the new request. Read the existing artifacts and decide whether to
 resume or ask the user.
+
+## BA Specification
+
+After ticket context is available, use the `ba` skill to create or audit a feature spec:
+
+```text
+specs/FEAT-XXX-<slug>.md
+```
+
+BA owns requirements only. The spec must include Context, User Story, Acceptance
+Criteria, Out of Scope, Open Questions, and Dependencies. BA must run its quality gates
+before marking the spec `ready`.
 
 ## Classification
 
@@ -45,13 +54,25 @@ Classify the ticket before selecting the workflow:
 - `docs`: documentation-only change.
 - `config`: environment, deployment, dependency, or project setup change.
 
-If the classification is unclear, record the uncertainty in `req.md` and ask the user or
-use `superpowers:brainstorming`.
+If the classification is unclear, record the uncertainty in the BA spec and ask the user
+or use `superpowers:brainstorming`.
 
 ## Planning
 
-Create `findings.md` when codebase exploration is needed. Create `plan.md` when the
-ticket needs multiple implementation steps, cross-area changes, or user approval.
+After BA marks the spec `ready`, use the `lead` skill before Dev starts.
+
+Lead must read the spec, run the architecture/code review checklist as applicable, and
+decide whether an ADR is required. If an ADR is required, Lead creates:
+
+```text
+docs/adr/NNNN-<slug>.md
+```
+
+If Lead approves the feature, Lead sets spec status to `in-dev`. If Lead blocks the
+feature, stop before implementation and report the blocking issues.
+
+Create `findings.md` when codebase exploration is needed. Use
+`superpowers:writing-plans` for detailed implementation plans after Lead approval.
 
 Keep plans scoped to one ticket unless the user explicitly asks for a bundled change.
 

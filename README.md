@@ -10,6 +10,8 @@ targets Codex and routes ticket work through Codex superpowers.
 
 - `plane-ticket-reader`: read-only Plane.so access for projects, work items, comments,
   states, labels, members, cycles, and modules.
+- `ba`: creates and validates feature specs in `specs/FEAT-XXX-<slug>.md`.
+- `lead`: reviews specs, approves development, creates ADRs, and flags tech debt.
 - `ticket-workflow`: a ticket orchestration skill that fetches ticket context, creates
   task artifacts, classifies the work, and routes the next phase through superpowers.
 - `codex/agent-ticket-skills`: a plugin-ready Codex adapter that exposes the neutral
@@ -21,6 +23,10 @@ targets Codex and routes ticket work through Codex superpowers.
 agent-ticket-skills/
 ├── README.md
 ├── skills/
+│   ├── ba/
+│   │   └── SKILL.md
+│   ├── lead/
+│   │   └── SKILL.md
 │   ├── plane-ticket-reader/
 │   │   ├── SKILL.md
 │   │   └── scripts/
@@ -35,6 +41,8 @@ agent-ticket-skills/
 │       ├── .codex-plugin/
 │       │   └── plugin.json
 │       ├── skills/
+│       │   ├── ba -> ../../../skills/ba
+│       │   ├── lead -> ../../../skills/lead
 │       │   ├── plane-ticket-reader -> ../../../skills/plane-ticket-reader
 │       │   └── ticket-workflow -> ../../../skills/ticket-workflow
 │       └── scripts/
@@ -103,6 +111,8 @@ Expose the skills at project level:
 mkdir -p .codex/skills
 ln -s /Users/nhathv/DEV/agent-ticket-skills/skills/plane-ticket-reader .codex/skills/plane-ticket-reader
 ln -s /Users/nhathv/DEV/agent-ticket-skills/skills/ticket-workflow .codex/skills/ticket-workflow
+ln -s /Users/nhathv/DEV/agent-ticket-skills/skills/ba .codex/skills/ba
+ln -s /Users/nhathv/DEV/agent-ticket-skills/skills/lead .codex/skills/lead
 ```
 
 Add the Plane CLI to `PATH` for the current shell:
@@ -132,7 +142,7 @@ Replace `TAD-1816` with a real ticket ID from your Plane workspace.
 Read a ticket only:
 
 ```text
-Use ticket-workflow to read TAD-1816 and create tasks/TAD-1816/req.md only. Do not implement.
+Use ticket-workflow to read TAD-1816, save raw ticket context, and ask BA to create the spec only. Do not implement.
 ```
 
 Plan without implementation:
@@ -158,9 +168,11 @@ Use ticket-workflow to investigate bug ticket TAD-1816. Reproduce or characteriz
 `ticket-workflow` coordinates the lifecycle:
 
 1. Fetch ticket context with `plane-ticket-reader`.
-2. Create `tasks/<ticket-id>/req.md`.
-3. Classify the ticket as bug, feature, refactor, investigation, docs, or config.
-4. Route to the right superpower phase:
+2. Save raw context to `tasks/<ticket-id>/ticket-context.json`.
+3. Ask BA to create or audit `specs/FEAT-XXX-<slug>.md`.
+4. Ask Lead to review the spec, create an ADR if needed, and approve or block development.
+5. Classify the ticket as bug, feature, refactor, investigation, docs, or config.
+6. Route to the right superpower phase:
    - `superpowers:brainstorming`
    - `superpowers:writing-plans`
    - `superpowers:using-git-worktrees`
@@ -168,8 +180,9 @@ Use ticket-workflow to investigate bug ticket TAD-1816. Reproduce or characteriz
    - `superpowers:test-driven-development`
    - `superpowers:verification-before-completion`
    - `superpowers:requesting-code-review`
-5. Track findings, plan, and progress under `tasks/<ticket-id>/` when needed.
-6. Report ticket summary, changed files, validation, gaps, and branch/worktree details.
+7. Track findings and progress under `tasks/<ticket-id>/` when needed.
+8. Report ticket summary, spec status, Lead decision, changed files, validation, gaps,
+   and branch/worktree details.
 
 ## Plane CLI Commands
 

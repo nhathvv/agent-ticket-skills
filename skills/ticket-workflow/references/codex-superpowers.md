@@ -8,7 +8,7 @@ the work.
 | Situation | Required superpower |
 | --- | --- |
 | Requirements are unclear, design choices are open, or user approval is needed | `superpowers:brainstorming` |
-| Requirements are clear and implementation needs a written plan | `superpowers:writing-plans` |
+| BA spec is ready, Lead has approved, and implementation needs a written plan | `superpowers:writing-plans` |
 | Work should happen in an isolated branch/worktree | `superpowers:using-git-worktrees` |
 | The ticket is a bug or observed behavior is unexplained | `superpowers:systematic-debugging` |
 | Code behavior must change and tests are feasible | `superpowers:test-driven-development` |
@@ -22,8 +22,7 @@ Do not summarize a superpower from memory when it is available; load it and foll
 current instructions.
 
 For bug tickets, reproduce or characterize the failure before editing code. For feature
-tickets, get requirement/design approval before implementation when the behavior is not
-fully specified.
+tickets, use `ba` for requirements and `lead` for approval before implementation.
 
 If a required superpower is unavailable, continue with the closest local discipline and
 report the missing skill as a gap in the final output.
@@ -34,7 +33,9 @@ Bug:
 
 ```text
 plane-ticket-reader
-ticket-workflow req.md
+ticket-workflow ticket-context.json
+ba spec
+lead review
 superpowers:systematic-debugging
 superpowers:test-driven-development
 superpowers:verification-before-completion
@@ -44,8 +45,9 @@ Feature:
 
 ```text
 plane-ticket-reader
-ticket-workflow req.md
-superpowers:brainstorming
+ticket-workflow ticket-context.json
+ba spec
+lead review
 superpowers:writing-plans
 superpowers:using-git-worktrees
 superpowers:test-driven-development
@@ -56,7 +58,7 @@ Investigation-only:
 
 ```text
 plane-ticket-reader
-ticket-workflow req.md
+ticket-workflow ticket-context.json
 findings.md
 superpowers:verification-before-completion
 ```

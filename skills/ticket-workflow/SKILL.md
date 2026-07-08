@@ -1,6 +1,6 @@
 ---
 name: ticket-workflow
-description: Coordinate Codex work from one or more ticket IDs such as TAD-1816. Use when the user asks Codex to read, plan, implement, fix, investigate, or validate Plane tickets, especially when the workflow should combine plane-ticket-reader with Codex superpowers.
+description: Coordinate Codex work from one or more ticket IDs such as TAD-1816. Use when the user asks Codex to read, specify, plan, implement, fix, investigate, or validate Plane tickets through plane-ticket-reader, BA specs, Lead architecture review, and Codex superpowers.
 ---
 
 # Ticket Workflow
@@ -18,11 +18,12 @@ and Codex superpowers; it does not replace them.
 
 1. Read ticket context with `plane-ticket-reader`.
 2. Create `tasks/<ticket-id>/` in the implementation repository.
-3. Write `tasks/<ticket-id>/req.md` with title, description, metadata, links, and relevant comments.
-4. Classify the ticket as `bug`, `feature`, `refactor`, `investigation`, `docs`, or `config`.
-5. Choose the next phase from `references/codex-superpowers.md`.
-6. Track findings, plan, and progress when implementation work is required.
-7. Before completion, verify and report according to the output contract.
+3. Save raw ticket context to `tasks/<ticket-id>/ticket-context.json`.
+4. Use `ba` to create or audit `specs/FEAT-XXX-<slug>.md`.
+5. Use `lead` to review the spec, create ADRs when needed, and approve or block development.
+6. Choose the implementation phase from `references/codex-superpowers.md`.
+7. Track progress when implementation work is required.
+8. Before completion, verify and report according to the output contract.
 
 For the detailed lifecycle rules, read `references/ticket-lifecycle.md`.
 For Codex superpower routing, read `references/codex-superpowers.md`.
@@ -33,21 +34,30 @@ Create these files only when they are useful for the ticket scope:
 
 ```text
 tasks/<ticket-id>/
-├── req.md
+├── ticket-context.json
 ├── findings.md
-├── plan.md
 └── progress.md
+
+specs/
+└── FEAT-XXX-<slug>.md
+
+docs/adr/
+└── NNNN-<slug>.md
 ```
 
-Use `req.md` for raw ticket context. Use `findings.md` for codebase exploration and
-root-cause notes. Use `plan.md` for the approved implementation plan. Use `progress.md`
-for execution checkpoints.
+Use `ticket-context.json` for raw Plane output. Use `specs/FEAT-XXX-<slug>.md` for the
+BA requirements artifact. Use `docs/adr/NNNN-<slug>.md` only when Lead determines an ADR
+is required. Use `findings.md` for codebase exploration and root-cause notes. Use
+`progress.md` for execution checkpoints.
 
 ## Output Contract
 
 End ticket work with:
 
 - Ticket summary: ID, title, classification, and scope.
+- Spec path and status.
+- Lead decision: approved, blocked, or no implementation needed.
+- ADR path when one was created.
 - Files changed or created.
 - Validation performed, including commands and outcomes.
 - Remaining gaps or blocked items.
